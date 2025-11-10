@@ -6,6 +6,7 @@ variable vpc_cidr_block {}
 variable subnet_cidr_block {}
 variable avail_zone {}
 variable env_prefix {}
+variable my_ip {}
 
 resource "aws_vpc" "myapp-vpc" {
     cidr_block = var.vpc_cidr_block
@@ -24,33 +25,67 @@ resource "aws_subnet" "myapp-subnet-l" {
     }
 }
 
-# resource "aws_vpc" "dev-vpc" {
-#     cidr_block = "10.0.0.0/16"  
-# }
+/*resource "aws_route_table" "myapp-route_table" {
+    vpc_id = aws_vpc.myapp-vpc.id
+    route {
+        cidr_block = "0.0.0.0/0"
+        gateway_id = aws_internet_gateway.myapp-igw.id
+    }
+    tags = {
+        Name = "${var.env_prefix}-rtb"
+    }
+}
 
-# resource "aws_vpc" "dev-vpc-1" {
-#     cidr_block = "10.0.0.0/24"
-#     tags = {
-#         Name: "dev-vpc-1-tag"
-#     } 
-# }
+resource "aws_route_table_association" "a-rtb-subnet" {
+    subnet_id = aws_subnet.myapp-subnet-l.id
+    route_table_id = aws_route_table.myapp-route_table.id
+}*/
 
-# output "aws_vpc_dev_id" {
-#   value = aws_vpc.dev-vpc-1.cidr_block
-# }
+resource "aws_default_route_table" "main-rtb" {
+    default_route_table_id = aws_vpc.myapp-vpc.default_route_table_id
+    route {
+        cidr_block = "0.0.0.0/0"
+        gateway_id = aws_internet_gateway.myapp-igw.id
+    }
+    tags = {
+        Name = "${var.env_prefix}-main-rtb"
+    }
+}
 
-# resource "aws_subnet" "dev-subnet-1" {
-#     vpc_id = aws_vpc.dev-vpc.id
-#     cidr_block = "10.0.10.0/24"
-#     availability_zone = "ap-south-1a"
-# }
+resource "aws_internet_gateway" "myapp-igw" {
+    vpc_id = aws_vpc.myapp-vpc.id
+    tags = {
+        Name = "${var.env_prefix}-igw"
+    }
+}
 
-# data "aws_vpc" "existing_vpc" {
-#     default = true
-# }
+resource "aws_security_group" "myapp-sg" {
+    name = "${var.env_prefix}-sg"
+    description = "Allow HTTP and SSH inbound traffic"
+    vpc_id = aws_vpc.myapp-vpc.id
 
-# resource "aws_subnet" "dev-subnet-2" {
-#     vpc_id = data.aws_vpc.existing_vpc.id
-#     cidr_block = "172.31.48.0/20"
-#     availability_zone = "ap-south-1a"
-# }
+    ingress {
+        from_port = 22
+        to_port = 22
+        protocol = "tcp"
+        cidr_blocks = [var.my_ip]
+    }
+
+    ingress {
+        from_port = 8080    
+        to_port = 8080
+        protocol = "tcp"
+        cidr_blocks = ["0.0.0.0/0"]
+    }
+    
+    egress {
+        from_port = 0
+        to_port = 0
+        protocol = "-1"
+        cidr_blocks = []
+        prefix_list_ids = []
+    }
+    tags = {
+        Name = "${var.env_prefix}-sg"
+    }
+}
