@@ -7,6 +7,7 @@ variable subnet_cidr_block {}
 variable avail_zone {}
 variable env_prefix {}
 variable my_ip {}
+variable instance_type {}
 
 resource "aws_vpc" "myapp-vpc" {
     cidr_block = var.vpc_cidr_block
@@ -59,9 +60,10 @@ resource "aws_internet_gateway" "myapp-igw" {
     }
 }
 
-resource "aws_security_group" "myapp-sg" {
-    name = "${var.env_prefix}-sg"
-    description = "Allow HTTP and SSH inbound traffic"
+#resource "aws_security_group" "myapp-sg" {
+resource "aws_default_security_group" "default-sg" {
+    #name = "${var.env_prefix}-sg"
+    #description = "Allow HTTP and SSH inbound traffic"
     vpc_id = aws_vpc.myapp-vpc.id
 
     ingress {
@@ -86,6 +88,36 @@ resource "aws_security_group" "myapp-sg" {
         prefix_list_ids = []
     }
     tags = {
-        Name = "${var.env_prefix}-sg"
+       # Name = "${var.env_prefix}-sg"
+        Name = "${var.env_prefix}-default-sg"
+    }
+}
+
+
+data "aws_ami" "latest-amazon-linux-image" {
+    most_recent = true
+    owners = ["amazon"] # Canonical
+
+    filter {
+        name = "name"
+        values = ["al2023-ami*-x86_64"]
+    }
+
+    filter {
+        name = "virtualization-type"
+        values = ["hvm"]
+    }
+}
+
+resource "aws_instance" "my_app_server" {
+    ami = data.aws_ami.latest-amazon-linux-image.id
+    subnet_id = aws_subnet.myapp-subnet-l.id
+    instance_type = var.instance_type
+    vpc_security_group_ids = [aws_default_security_group.default-sg.id]
+    availability_zone = var.avail_zone
+    associate_public_ip_address = true
+
+    tags = {
+        Name = "${var.env_prefix}-app-server"
     }
 }
