@@ -8,6 +8,7 @@ variable avail_zone {}
 variable env_prefix {}
 variable my_ip {}
 variable instance_type {}
+variable public_key_path {}
 
 resource "aws_vpc" "myapp-vpc" {
     cidr_block = var.vpc_cidr_block
@@ -109,6 +110,11 @@ data "aws_ami" "latest-amazon-linux-image" {
     }
 }
 
+resource "aws_key_pair" "ssh-aws_key_pair" {
+    key_name = "${var.env_prefix}-keypair"
+    public_key = file(var.public_key_path)
+}
+
 resource "aws_instance" "my_app_server" {
     ami = data.aws_ami.latest-amazon-linux-image.id
     subnet_id = aws_subnet.myapp-subnet-l.id
@@ -116,6 +122,14 @@ resource "aws_instance" "my_app_server" {
     vpc_security_group_ids = [aws_default_security_group.default-sg.id]
     availability_zone = var.avail_zone
     associate_public_ip_address = true
+
+    user_data = <<EOF
+                    #!/bin/bash
+                    sudo yum update —y sudo yum install
+                    sudo systemctl start docker
+                    sudo usermod -aG docker ec2-user
+                    docker run -p 8080:80 nginx
+                EOF
 
     tags = {
         Name = "${var.env_prefix}-app-server"
